@@ -577,7 +577,7 @@ static int th260_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		goto error;
 	}
 
-	th260_cdev[minor].bar0base = ioremap_nocache(pci_resource_start(pdev, BAR_0), BAR_0_LEN);
+	th260_cdev[minor].bar0base = ioremap(pci_resource_start(pdev, BAR_0), BAR_0_LEN);
 	if (!th260_cdev[minor].bar0base) {
 		dev_err(&(pdev->dev),"Failed to ioremap BAR 0!\n");
 		cdev_del(cdev);
