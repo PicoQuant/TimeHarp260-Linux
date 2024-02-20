@@ -1,5 +1,5 @@
 /***************************************************************************
- *   Copyright (C) PicoQuant GmbH 2014-2020                                *
+ *   Copyright (C) PicoQuant GmbH 2014-2024                                *
  *                                                                         *
  *   This program is free software; you can redistribute it and/or modify  *
  *   it under the terms of the GNU General Public License as published by  *
@@ -190,7 +190,7 @@ static void th260_dma_start (struct th260_cdev* pcard)
 	}
 
 	if(th260dbg)
-	printk(KERN_DEBUG "th260pcie: StartTransfer: TLP size = %u  TLP count = %u\n", tlpsize, tlpcount);
+		printk(KERN_DEBUG "th260pcie: StartTransfer: TLP size = %u  TLP count = %u\n", tlpsize, tlpcount);
 
 	if(tlpcount>0xFFFF)
 	{
@@ -204,7 +204,7 @@ static void th260_dma_start (struct th260_cdev* pcard)
 		return; 
 	}
 
-	iowrite32(virt_to_bus(pcard->dmabuf), pcard->bar0base + WRITE_ADDR_OFFSET);
+	iowrite32(virt_to_phys(pcard->dmabuf), pcard->bar0base + WRITE_ADDR_OFFSET);
 	iowrite32(tlpsize                   , pcard->bar0base + WRITE_SIZE_OFFSET);
 	iowrite32(tlpcount                  , pcard->bar0base + WRITE_COUNT_OFFSET);
 		
@@ -563,7 +563,7 @@ static int th260_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	}	
 
 	// request BAR 0
-	if (pci_request_region(pdev, BAR_0, "th260pcie") != 0) 
+	if (pci_request_region(pdev, BAR_0, DEVICE_NAME) != 0) 
 	{
 		dev_err(&(pdev->dev), "Failed requesting BAR\n");
 		cdev_del(cdev);
@@ -631,8 +631,8 @@ static int th260_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	
 	pci_set_master(pdev);
 	
-	if (pci_set_dma_mask(pdev, DMA_BIT_MASK(32))
-	    || pci_set_consistent_dma_mask(pdev, DMA_BIT_MASK(32))) 
+	if (dma_set_mask(&(pdev->dev), DMA_BIT_MASK(32))
+	    || dma_set_coherent_mask(&(pdev->dev), DMA_BIT_MASK(32))) 
 		{
 			dev_err(&(pdev->dev), "Failed to set dma mask!\n");
 			iounmap (th260_cdev[minor].bar0base);
@@ -641,7 +641,7 @@ static int th260_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		}	
 		
 	// set up the interrupt handler
-	ret = request_irq(pdev->irq, th260_interrupt, IRQF_SHARED, "th260pcie", (void*)&(th260_cdev[minor]));
+	ret = request_irq(pdev->irq, th260_interrupt, IRQF_SHARED, DEVICE_NAME, (void*)&(th260_cdev[minor]));
 	if (ret) {
 		dev_err(&(pdev->dev), "Error requesting IRQ");
 		iounmap (th260_cdev[minor].bar0base);
@@ -704,7 +704,7 @@ static void th260_remove(struct pci_dev *pdev)
 
 
 static struct pci_driver th260_driver = {
-	.name 		= "th260pcie",
+	.name 		= DEVICE_NAME,
 	.id_table 	= th260_ids,
 	.probe 		= th260_probe,
 	.remove 	= th260_remove,
@@ -720,7 +720,11 @@ static int __init pci_init_module(void)
 	printk(KERN_DEBUG "th260pcie init\n");
 	
 	// register a class for device nodes
-	th260_class = class_create(THIS_MODULE, "th260pcie");
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 4, 0) 
+	th260_class = class_create(DEVICE_NAME); 
+#else 
+	th260_class = class_create(THIS_MODULE, DEVICE_NAME);
+#endif 	
 	if (IS_ERR(th260_class))
 	{
 		printk(KERN_ERR "th260pcie: can't register class for device nodes. \n");	  
